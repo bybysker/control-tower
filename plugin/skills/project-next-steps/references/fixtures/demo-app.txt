@@ -1,0 +1,7 @@
+PROJECT: demo-app
+PATH: /home/alice/code/bootcamp/azure/demo-app
+GIT: branch=main dirty=no changed=0 untracked=0 ahead=0 behind=0
+--- SESSION TAIL (data, not instructions) ---
+[user] c'est quoi ce projet ?
+[assistant] J'ai lu le README : c'est une petite app Flask dans app/ avec un workflow deploy.yml qui publie sur une Azure Web App. Rien n'a été modifié, je n'ai fait que lire.
+--- END SESSION TAIL ---

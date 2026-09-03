@@ -1,0 +1,5 @@
+{"type":"user","message":{"role":"user","content":"hello"},"uuid":"u1","timestamp":"2026-09-01T08:00:00.000Z","cwd":"/tmp/m","isSidechain":false}
+not json at all
+{"type":"attachment","attachment":{"type":"deferred_tools_delta"},"uuid":"x1","timestamp":"2026-09-01T08:00:01.000Z","isSidechain":false}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hi"}],"stop_reason":"end_turn"},"uuid":"a1","timestamp":"2026-09-01T08:00:02.000Z","isSidechain":false}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tex

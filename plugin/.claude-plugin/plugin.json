@@ -1,0 +1,5 @@
+{
+  "name": "control-tower",
+  "version": "0.1.0",
+  "description": "Skills and agents for supervising projects with Control Tower: per-project next steps, session handoff, and cross-project triage."
+}

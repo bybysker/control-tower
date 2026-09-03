@@ -1,0 +1,10 @@
+{"type":"queue-operation","operation":"enqueue","timestamp":"2026-09-01T10:00:00.000Z","sessionId":"aaaa1111-0000-0000-0000-000000000001","content":"queued"}
+{"parentUuid":null,"isSidechain":false,"type":"user","message":{"role":"user","content":"Bootstrap the thing"},"uuid":"u1","timestamp":"2026-09-01T10:00:01.000Z","sessionId":"aaaa1111-0000-0000-0000-000000000001","cwd":"/home/alice/code","gitBranch":"main","version":"2.1.197","entrypoint":"cli","userType":"external"}
+{"parentUuid":"u1","isSidechain":false,"type":"assistant","message":{"role":"assistant","model":"claude-opus-5","content":[{"type":"text","text":"On it.\nStarting now."},{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"ls -la"}}],"stop_reason":"tool_use","usage":{"output_tokens":10}},"uuid":"a1","timestamp":"2026-09-01T10:00:02.000Z","sessionId":"aaaa1111-0000-0000-0000-000000000001","cwd":"/home/alice/code","version":"2.1.197"}
+{"parentUuid":"a1","isSidechain":false,"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"total 0","is_error":false}]},"toolUseResult":{"stdout":"total 0"},"uuid":"u2","timestamp":"2026-09-01T10:00:03.000Z","sessionId":"aaaa1111-0000-0000-0000-000000000001","cwd":"/home/alice/code"}
+{"parentUuid":"u2","isSidechain":false,"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done."}],"stop_reason":"end_turn"},"uuid":"a2","timestamp":"2026-09-01T10:00:04.000Z","sessionId":"aaaa1111-0000-0000-0000-000000000001","cwd":"/home/alice/code/subdir"}
+{"type":"ai-title","aiTitle":"First generated title","sessionId":"aaaa1111-0000-0000-0000-000000000001"}
+{"type":"ai-title","aiTitle":"Regenerated title","sessionId":"aaaa1111-0000-0000-0000-000000000001"}
+{"type":"custom-title","customTitle":"User pinned title","sessionId":"aaaa1111-0000-0000-0000-000000000001"}
+{"type":"last-prompt","lastPrompt":"Bootstrap the thing","leafUuid":"u1","sessionId":"aaaa1111-0000-0000-0000-000000000001"}
+{"type":"bridge-session","sessionId":"aaaa1111-0000-0000-0000-000000000001","bridgeSessionId":"cse_x","lastSequenceNum":0}

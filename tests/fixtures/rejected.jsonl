@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":"edit that file"},"uuid":"u1","timestamp":"2026-08-14T09:00:00.000Z","cwd":"/tmp/r","isSidechain":false}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/tmp/r/a.ts"}}],"stop_reason":"tool_use"},"uuid":"a1","timestamp":"2026-08-14T09:00:01.000Z","isSidechain":false}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was not applied).","is_error":true}]},"uuid":"u2","timestamp":"2026-08-14T09:00:02.000Z","isSidechain":false}

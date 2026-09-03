@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: lint
+        run: npm run lint
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: test
+        run: npm test
+
+      - name: dist/ committed is the dist/ we would build
+        # dist/cli.js ships in git so 'npm install -g github:…' works without
+        # devDependencies. A stale committed build is a silent regression, so
+        # rebuild and refuse any difference.
+        run: |
+          npm run build
+          git diff --exit-code -- dist/ || { echo "::error::dist/ is stale — run 'npm run build' and commit it"; exit 1; }
+      - name: build
+        run: npm run build
+
+      # The bin is only useful if it is executable and self-describing.
+      - name: smoke -- built CLI runs
+        run: |
+          test -x dist/cli.js
+          head -1 dist/cli.js | grep -q '^#!/usr/bin/env node'
+          ./dist/cli.js --help
+          ./dist/cli.js --version
+
+      # An empty store must produce a clean snapshot, not a crash.
+      - name: smoke -- empty store
+        run: ./dist/cli.js --once --path "$(mktemp -d)"

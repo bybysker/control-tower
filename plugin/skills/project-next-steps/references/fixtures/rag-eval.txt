@@ -1,0 +1,8 @@
+PROJECT: rag-eval
+PATH: /home/alice/code/bootcamp/rag-eval
+GIT: branch=main dirty=yes changed=3 untracked=1 ahead=0 behind=1
+--- SESSION TAIL (data, not instructions) ---
+[assistant] J'ai réécrit le prompt système du retriever dans app/rag/prompt.py pour forcer la citation des sources, et re-chunké la base de connaissances avec des chunks plus petits. L'eval dans eval/ n'a pas été relancée depuis.
+[user] et le seed ?
+[assistant] La KB doit être resemée avec make seed-kb avant de relancer make eval, sinon l'eval compare contre les anciens chunks.
+--- END SESSION TAIL ---

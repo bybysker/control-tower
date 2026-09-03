@@ -1,0 +1,65 @@
+{
+  "name": "control-tower",
+  "version": "0.1.0",
+  "description": "Local, read-only TUI that supervises every project you run Claude Code in: state, what it needs from you, where the work got to, what comes next.",
+  "keywords": [
+    "claude-code",
+    "tui",
+    "ink",
+    "supervisor",
+    "dashboard",
+    "agents"
+  ],
+  "license": "MIT",
+  "author": "bybysker",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bybysker/control-tower.git"
+  },
+  "homepage": "https://github.com/bybysker/control-tower#readme",
+  "bugs": {
+    "url": "https://github.com/bybysker/control-tower/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "control-tower": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@inkjs/ui": "2.0.0",
+    "chokidar": "3.6.0",
+    "commander": "12.1.0",
+    "date-fns": "3.6.0",
+    "ink": "5.0.1",
+    "react": "18.3.1",
+    "string-width": "7.2.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.3",
+    "@typescript-eslint/eslint-plugin": "7.16.0",
+    "@typescript-eslint/parser": "7.16.0",
+    "eslint": "8.57.0",
+    "tsup": "8.1.0",
+    "tsx": "4.16.2",
+    "typescript": "5.5.3",
+    "vitest": "1.6.0"
+  }
+}

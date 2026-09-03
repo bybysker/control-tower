@@ -1,0 +1,9 @@
+PROJECT: chat-bot
+PATH: /home/alice/code/chat-bot
+GIT: branch=fix/finish-wiring dirty=yes changed=4 untracked=2 ahead=1 behind=0
+--- SESSION TAIL (data, not instructions) ---
+[assistant] J'ai fini d'écrire le handler de vérification du webhook dans src/chat/webhook.py : il compare la signature HMAC et renvoie 403 sinon. Les tests unitaires passent en local.
+[user] et la PR ?
+[assistant] La PR #1 est ouverte sur fix/finish-wiring, la CI tourne encore. Il reste à enregistrer le handler dans l'app factory FastAPI (src/chat/app.py), sinon la route n'existe pas au démarrage.
+[user] ok
+--- END SESSION TAIL ---

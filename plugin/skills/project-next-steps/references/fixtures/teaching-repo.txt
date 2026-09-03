@@ -1,0 +1,8 @@
+PROJECT: teaching-repo
+PATH: /home/alice/code/bootcamp/teaching-repo
+GIT: branch=peerpro dirty=yes changed=9 untracked=0 ahead=? behind=?
+--- SESSION TAIL (data, not instructions) ---
+[assistant] J'ai fini de semer les 11 trous sur main : les fonctions de agent/tools.py et db.py sont vidées, les tests d'acceptation sont rouges comme prévu. L'implémentation de référence reste sur la branche instructor, locale uniquement. Le validateur no-hints sur main est propre.
+[user] et make seed ?
+[assistant] make seed remplit teaching_db_data mais échoue sur un décalage de colonnes entre source_two et source_one. C'est dans db.py, côté stack, pas côté pédagogie.
+--- END SESSION TAIL ---
