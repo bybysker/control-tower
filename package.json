@@ -1,6 +1,6 @@
 {
   "name": "control-tower",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local, read-only TUI that supervises every project you run Claude Code in: state, what it needs from you, where the work got to, what comes next.",
   "keywords": [
     "claude-code",

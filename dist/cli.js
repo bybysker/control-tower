@@ -7,7 +7,7 @@ import { Command, InvalidArgumentError } from "commander";
 
 // src/app.tsx
 import { useEffect as useEffect2, useMemo as useMemo2, useState as useState2 } from "react";
-import { Box as Box7, useStdout } from "ink";
+import { Box as Box7, useApp as useApp2, useStdout } from "ink";
 import { Spinner } from "@inkjs/ui";
 
 // src/hooks/useSessions.ts
@@ -2325,9 +2325,11 @@ function App({
   ai,
   userTasks,
   checkSecrets,
-  initialFilter
+  initialFilter,
+  once = false
 }) {
   const { stdout } = useStdout();
+  const { exit } = useApp2();
   const width = Math.max(60, stdout?.columns ?? 100);
   const height = Math.max(12, stdout?.rows ?? 30);
   const { projects, loading, error, refresh, summarize, summaries, summaryTick } = useSessions({
@@ -2352,6 +2354,11 @@ function App({
     const t = setInterval(() => setNow(/* @__PURE__ */ new Date()), 1e3);
     return () => clearInterval(t);
   }, []);
+  useEffect2(() => {
+    if (!once || loading) return;
+    const t = setTimeout(() => exit(), 80);
+    return () => clearTimeout(t);
+  }, [once, loading, exit]);
   const visibleProjects = useMemo2(
     () => filterProjects(projects, filtering ? filterDraft : filter),
     [projects, filter, filterDraft, filtering]
@@ -2611,7 +2618,7 @@ function buildProgram() {
   ).option("-f, --filter <pattern>", "initial filter on project or session title").option("--no-watch", "disable the fs watcher and poll only").option("--no-git", "do not read git state from project directories").option("--no-user-tasks", "do not read .env.example / .env key NAMES for what only you can do").option("--secrets", "also ask GitHub which repository secrets exist (needs gh and the network)").option(
     "--ai",
     "allow asking Claude for next steps (key A). Sends the tail of a project\u2019s newest session to the Claude API and caches the answer"
-  ).option("--once", "print a plain-text snapshot and exit (for scripting)");
+  ).option("--once", "paint one frame and exit; plain text when piped (for scripting)").option("--plain", "with --once: force the plain-text form even on a terminal");
   return program;
 }
 async function main() {
@@ -2640,7 +2647,28 @@ async function main() {
         p.supervision.nextSteps = [...p.supervision.nextSteps, ...summarySteps(store.get(p.dir))];
       }
     }
-    process.stdout.write(renderSnapshot(filtered) + "\n");
+    if (opts.plain || !process.stdout.isTTY) {
+      process.stdout.write(renderSnapshot(filtered) + "\n");
+      return;
+    }
+    const shot = render(
+      /* @__PURE__ */ jsx8(
+        App,
+        {
+          claudeHome,
+          refreshInterval: 0,
+          watch: false,
+          git: opts.git,
+          ai: opts.ai ?? false,
+          userTasks: opts.userTasks,
+          checkSecrets: opts.secrets ?? false,
+          initialFilter: opts.filter ?? "",
+          once: true
+        }
+      ),
+      { exitOnCtrlC: true }
+    );
+    await shot.waitUntilExit();
     return;
   }
   if (!process.stdout.isTTY) {

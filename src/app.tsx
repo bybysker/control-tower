@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Box, useStdout } from 'ink';
+import { Box, useApp, useStdout } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import type { Project, Session } from './data/types.js';
 import { useSessions } from './hooks/useSessions.js';
@@ -20,6 +20,8 @@ export interface AppProps {
   userTasks: boolean;
   checkSecrets: boolean;
   initialFilter: string;
+  /** Paint one frame, then exit. `--once` on a terminal. */
+  once?: boolean;
 }
 
 /**
@@ -64,8 +66,10 @@ export function App({
   userTasks,
   checkSecrets,
   initialFilter,
+  once = false,
 }: AppProps): React.JSX.Element {
   const { stdout } = useStdout();
+  const { exit } = useApp();
   const width = Math.max(60, stdout?.columns ?? 100);
   const height = Math.max(12, stdout?.rows ?? 30);
 
@@ -94,6 +98,14 @@ export function App({
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // --once on a terminal: Ink leaves the last frame on screen when it
+  // unmounts, so exiting right after the first real paint is the snapshot.
+  useEffect(() => {
+    if (!once || loading) return;
+    const t = setTimeout(() => exit(), 80);
+    return () => clearTimeout(t);
+  }, [once, loading, exit]);
 
   const visibleProjects = useMemo(
     () => filterProjects(projects, filtering ? filterDraft : filter),

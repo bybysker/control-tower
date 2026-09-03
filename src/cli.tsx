@@ -19,6 +19,7 @@ interface CliOptions {
   userTasks: boolean;
   secrets: boolean;
   once: boolean;
+  plain: boolean;
 }
 
 function parseInterval(value: string): number {
@@ -55,7 +56,8 @@ export function buildProgram(): Command {
       'allow asking Claude for next steps (key A). Sends the tail of a project\u2019s ' +
         'newest session to the Claude API and caches the answer',
     )
-    .option('--once', 'print a plain-text snapshot and exit (for scripting)');
+    .option('--once', 'paint one frame and exit; plain text when piped (for scripting)')
+    .option('--plain', 'with --once: force the plain-text form even on a terminal');
   return program;
 }
 
@@ -79,6 +81,8 @@ async function main(): Promise<void> {
     if (opts.ai) {
       // A one-shot command may block; the TUI may not. Requests run in
       // parallel (a few seconds each) and the cache absorbs repeat runs.
+      // The store persists to disk, which is how the framed form below
+      // picks the answers up too.
       const store = new SummaryStore();
       await store.load();
       await Promise.all(
@@ -91,7 +95,27 @@ async function main(): Promise<void> {
       }
     }
 
-    process.stdout.write(renderSnapshot(filtered) + '\n');
+    // In a pipe, or on request: the grep-friendly text. On a terminal: the
+    // real dashboard, in colour, painted once.
+    if (opts.plain || !process.stdout.isTTY) {
+      process.stdout.write(renderSnapshot(filtered) + '\n');
+      return;
+    }
+    const shot = render(
+      <App
+        claudeHome={claudeHome}
+        refreshInterval={0}
+        watch={false}
+        git={opts.git}
+        ai={opts.ai ?? false}
+        userTasks={opts.userTasks}
+        checkSecrets={opts.secrets ?? false}
+        initialFilter={opts.filter ?? ''}
+        once
+      />,
+      { exitOnCtrlC: true },
+    );
+    await shot.waitUntilExit();
     return;
   }
 
