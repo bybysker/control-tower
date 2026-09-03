@@ -49,6 +49,21 @@ Say what `control-tower --once` printed, what you expected, and — if it is a
 rendering bug — your terminal size. If it is a parsing bug, the Claude Code
 version (`claude --version`) matters: the format moves between releases.
 
+## Updating the screenshots
+
+The README images are SVGs built from real frames, on a fictional store so no
+personal data can leak into them:
+
+```sh
+python3 scripts/demo-store.py /tmp/alice        # fake home: sessions, repos, .env files
+( sleep 3; printf '\003' ) | script -q /dev/null sh -c \
+  "stty cols 108 rows 34; TERM=xterm-256color FORCE_COLOR=3 ./dist/cli.js --path /tmp/alice/.claude" > /tmp/alice/dashboard.raw
+python3 scripts/ansi2svg.py /tmp/alice/dashboard.raw docs/assets/dashboard.svg
+```
+
+Check the frame first (every line exactly 108 columns, zero clear-screens —
+see `CLAUDE.md`), then commit the SVG.
+
 ## Cutting a release
 
 ```sh
