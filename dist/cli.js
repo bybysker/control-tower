@@ -628,6 +628,16 @@ function labelForAction(kind) {
       return "reply";
   }
 }
+function actionLocator(a, now = /* @__PURE__ */ new Date()) {
+  const parts = [];
+  const title = truncate(a.sessionTitle ?? "", 32);
+  if (title) parts.push(title);
+  if (a.entrypoint) parts.push(a.entrypoint);
+  if (a.startedAt) parts.push(`started ${agoLabel(a.startedAt, now)}`);
+  if (a.cwd) parts.push(truncateStart(a.cwd, 34));
+  parts.push(`#${a.sessionId.slice(0, 8)}`);
+  return parts.join(" \xB7 ");
+}
 function agoLabel(date, now = /* @__PURE__ */ new Date()) {
   const t = timeAgo(date, now);
   return t === "now" || t === "\u2014" ? t : `${t} ago`;
@@ -644,35 +654,64 @@ function colorForStep(step) {
 // src/data/actions.ts
 function deriveActions(session, now = /* @__PURE__ */ new Date()) {
   const out = [];
-  const base = { sessionId: session.sessionId, sessionTitle: session.title, since: session.lastActivity };
+  const base = {
+    sessionId: session.sessionId,
+    sessionTitle: session.title,
+    since: session.lastActivity,
+    // Which window to go to. Copied, not deduced: every field is something the
+    // transcript wrote down about itself.
+    entrypoint: session.entrypoint,
+    startedAt: session.firstTimestamp,
+    cwd: session.cwd
+  };
   const age = now.getTime() - session.lastActivity.getTime();
   if (session.pendingQuestion) {
     out.push({
       ...base,
       kind: "answer",
       label: session.pendingQuestion.question,
-      options: session.pendingQuestion.options
+      options: session.pendingQuestion.options,
+      turnIndex: lastIndex(session, (t) => t.role === "tool_use" && t.toolName === "AskUserQuestion")
     });
     return out;
   }
   if (session.status === "failed") {
-    const last = [...session.turns].reverse().find((t) => t.role === "tool_result" && t.isError);
-    out.push({ ...base, kind: "failed", label: last ? truncate(last.text, 120) : "last tool call failed" });
+    const at = lastIndex(session, (t) => t.role === "tool_result" && t.isError === true);
+    const last = at === void 0 ? void 0 : session.turns[at];
+    out.push({
+      ...base,
+      kind: "failed",
+      label: last ? truncate(last.text, 120) : "last tool call failed",
+      turnIndex: at
+    });
     return out;
   }
   if (session.pendingToolName && age >= RUNNING_WINDOW_MS && !session.lastToolRejectedByUser) {
     out.push({
       ...base,
       kind: "permission",
-      label: `${session.pendingToolName} is waiting for a result -- permission prompt, or the process died`
+      label: `${session.pendingToolName} is waiting for a result -- permission prompt, or the process died`,
+      turnIndex: lastIndex(session, (t) => t.role === "tool_use" && t.toolName === session.pendingToolName)
     });
     return out;
   }
   const text = session.lastAssistantText?.trim();
   if (text && text.endsWith("?") && !session.endsMidWork) {
-    out.push({ ...base, kind: "reply", label: lastSentence(text) });
+    out.push({
+      ...base,
+      kind: "reply",
+      label: lastSentence(text),
+      turnIndex: lastIndex(session, (t) => t.role === "assistant")
+    });
   }
   return out;
+}
+function lastIndex(session, pred) {
+  for (let i = session.turns.length - 1; i >= 0; i--) {
+    const turn = session.turns[i];
+    if (turn && pred(turn)) return i;
+  }
+  return void 0;
 }
 function lastSentence(text) {
   const parts = text.split(/(?<=[.!?])\s+/);
@@ -1887,6 +1926,16 @@ function ActiveProject({ project, width, rows: maxRows, now, summary }) {
       if (a.options && a.options.length > 0) {
         rows.push(/* @__PURE__ */ jsx3(Line, { width, segs: [{ t: "           " }, { t: a.options.map((o) => `[${o}]`).join("  "), color: "yellow" }] }, `ao-${a.sessionId}`));
       }
+      rows.push(
+        /* @__PURE__ */ jsx3(
+          Line,
+          {
+            width,
+            segs: [{ t: "           " }, { t: "\u21B3 ", color: RULE }, { t: actionLocator(a, now), dim: true, flex: true }]
+          },
+          `al-${a.sessionId}-${a.kind}`
+        )
+      );
     }
   }
   if (s.whereWeAre) {
@@ -2076,9 +2125,12 @@ function SessionRow({ session, selected, width, now }) {
 import { jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
 var MAX_NEXT = 8;
 var MAX_MEMORY = 6;
+function projectRows(project) {
+  return project.supervision.actions.length + project.sessions.length;
+}
 function actionRows(a, width) {
-  const wrapped = Math.min(2, Math.ceil(columns(a.label) / Math.max(20, width - 12)));
-  return wrapped + (a.options && a.options.length > 0 ? 1 : 0);
+  const wrapped = Math.min(2, Math.ceil(columns(a.label) / Math.max(20, width - 14)));
+  return wrapped + (a.options && a.options.length > 0 ? 1 : 0) + 1;
 }
 function projectViewFixedRows(project, width) {
   const s = project.supervision;
@@ -2092,8 +2144,9 @@ function ProjectView({ project, cursor, width, height, now }) {
   const git = describeGit(s.git);
   const fixed = projectViewFixedRows(project, width);
   const capacity = Math.max(2, height - fixed - 1);
+  const sessionCursor = cursor - s.actions.length;
   const maxOffset = Math.max(0, project.sessions.length - capacity);
-  const offset = Math.min(maxOffset, Math.max(0, cursor - capacity + 1));
+  const offset = Math.min(maxOffset, Math.max(0, sessionCursor - capacity + 1));
   const visible = project.sessions.slice(offset, offset + capacity);
   const hiddenBelow = Math.max(0, project.sessions.length - offset - capacity);
   const rule = (label) => `\u2500\u2500 ${label} ${"\u2500".repeat(Math.max(0, width - label.length - 4))}`;
@@ -2123,17 +2176,22 @@ function ProjectView({ project, cursor, width, height, now }) {
       /* @__PURE__ */ jsx5(Text5, { color: "redBright", children: rule(`needs you \xB7 ${s.actions.length}`) }),
       s.actions.map((a, i) => /* @__PURE__ */ jsxs4(Box5, { flexDirection: "column", children: [
         /* @__PURE__ */ jsxs4(Box5, { children: [
+          /* @__PURE__ */ jsx5(Text5, { color: i === cursor ? "cyan" : void 0, children: i === cursor ? "\u276F " : "  " }),
           /* @__PURE__ */ jsx5(Text5, { color: "redBright", children: labelForAction(a.kind).padEnd(9) }),
-          /* @__PURE__ */ jsx5(Box5, { width: width - 9 - 6, children: /* @__PURE__ */ jsx5(Text5, { wrap: "wrap", children: truncate(a.label, 2 * (width - 15)) }) }),
+          /* @__PURE__ */ jsx5(Box5, { width: width - 2 - 9 - 6, children: /* @__PURE__ */ jsx5(Text5, { wrap: "wrap", children: truncate(a.label, 2 * (width - 17)) }) }),
           /* @__PURE__ */ jsxs4(Text5, { dimColor: true, children: [
             " ",
             timeAgo(a.since, now).padStart(4)
           ] })
         ] }),
         a.options && a.options.length > 0 ? /* @__PURE__ */ jsxs4(Text5, { color: "yellow", children: [
-          " ".repeat(9),
-          truncate(a.options.map((o) => `[${o}]`).join("  "), width - 10)
-        ] }) : null
+          " ".repeat(11),
+          truncate(a.options.map((o) => `[${o}]`).join("  "), width - 12)
+        ] }) : null,
+        /* @__PURE__ */ jsxs4(Text5, { dimColor: true, children: [
+          " ".repeat(11),
+          truncate(`\u21B3 ${actionLocator(a, now)}`, width - 12)
+        ] })
       ] }, `${a.sessionId}-${i}`))
     ] }) : null,
     s.whereWeAre ? /* @__PURE__ */ jsxs4(Box5, { flexDirection: "column", children: [
@@ -2177,7 +2235,7 @@ function ProjectView({ project, cursor, width, height, now }) {
       SessionRow,
       {
         session,
-        selected: offset + i === cursor,
+        selected: offset + i === sessionCursor,
         width,
         now
       },
@@ -2195,6 +2253,20 @@ function ProjectView({ project, cursor, width, height, now }) {
 import "react";
 import { Box as Box6, Text as Text6 } from "ink";
 import { jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
+var FOCUS_TEXT_LINES = 4;
+var FOCUS_INDENT = 8;
+var FOCUS_MIN_TRANSCRIPT = 12;
+function focusBody(turn, width) {
+  const lines = wrapText(turn.text, Math.max(10, width - FOCUS_INDENT), FOCUS_TEXT_LINES);
+  return lines.length > 0 ? lines : [""];
+}
+function focusBlockRows(session, height, width, focus) {
+  if (focus === void 0 || focus < 0) return 0;
+  const turn = session.turns[focus];
+  if (!turn) return 0;
+  const rows = 3 + focusBody(turn, width).length;
+  return height - rows >= FOCUS_MIN_TRANSCRIPT ? rows : 0;
+}
 var ROLE_LABEL = {
   user: "user",
   assistant: "assistant",
@@ -2209,20 +2281,22 @@ function roleColor(turn) {
   if (turn.role === "tool_result") return turn.isError ? "red" : "gray";
   return "gray";
 }
-function transcriptCapacity(session, height) {
+function transcriptCapacity(session, height, width = 0, focus) {
   const planLines = session.plan.tasks.length > 0 ? session.plan.tasks.length + 2 : 2;
-  return Math.max(3, height - planLines - 6);
+  return Math.max(3, height - planLines - 6 - focusBlockRows(session, height, width, focus));
 }
 function SessionDetail({
   session,
   scroll,
   width,
   height,
-  now
+  now,
+  focus
 }) {
   const { plan } = session;
   const progress = planProgress(plan);
-  const transcriptHeight = transcriptCapacity(session, height);
+  const transcriptHeight = transcriptCapacity(session, height, width, focus);
+  const focusRows = focusBlockRows(session, height, width, focus);
   const visible = session.turns.slice(scroll, scroll + transcriptHeight);
   const roleW = 11;
   return /* @__PURE__ */ jsxs5(Box6, { flexDirection: "column", width, children: [
@@ -2283,6 +2357,7 @@ function SessionDetail({
         )
       ] }, task.id))
     ] }) : /* @__PURE__ */ jsx6(Box6, { marginTop: 1, children: /* @__PURE__ */ jsx6(Text6, { dimColor: true, children: "\u2500\u2500 no plan recorded (no TaskCreate or TodoWrite in this session) \u2500\u2500" }) }),
+    focusRows > 0 && focus !== void 0 ? /* @__PURE__ */ jsx6(FocusBlock, { session, focus, width }) : null,
     /* @__PURE__ */ jsxs5(Box6, { flexDirection: "column", marginTop: 1, children: [
       /* @__PURE__ */ jsxs5(Text6, { dimColor: true, children: [
         "\u2500\u2500 transcript (",
@@ -2299,6 +2374,37 @@ function SessionDetail({
         /* @__PURE__ */ jsx6(Text6, { dimColor: turn.role === "tool_result", children: truncate(turn.text, Math.max(10, width - roleW - 3)) })
       ] }, `${scroll + i}`))
     ] })
+  ] });
+}
+function focusHeading(turn) {
+  if (turn.role === "tool_result") return turn.isError ? "what failed" : "what came back";
+  if (turn.role === "tool_use") return "what it is waiting on";
+  return "where this points";
+}
+function FocusBlock({ session, focus, width }) {
+  const turn = session.turns[focus];
+  if (!turn) return /* @__PURE__ */ jsx6(Box6, {});
+  const call = turn.role === "tool_result" ? session.turns.slice(0, focus).reverse().find((t) => t.role === "tool_use") : void 0;
+  const callText = call ? call.text : turn.toolName ?? ROLE_LABEL[turn.role];
+  const heading = `\u2500\u2500 ${focusHeading(turn)} `;
+  const fill = Math.max(0, width - columns(heading));
+  return /* @__PURE__ */ jsxs5(Box6, { flexDirection: "column", marginTop: 1, children: [
+    /* @__PURE__ */ jsx6(
+      Line,
+      {
+        width,
+        segs: [{ t: heading, color: turn.isError ? "red" : "gray" }, { t: "\u2500".repeat(fill), dim: true, flex: true }]
+      }
+    ),
+    /* @__PURE__ */ jsx6(Line, { width, segs: [{ t: "call".padEnd(FOCUS_INDENT), dim: true }, { t: callText, flex: true }] }),
+    focusBody(turn, width).map((l, i) => /* @__PURE__ */ jsx6(
+      Line,
+      {
+        width,
+        segs: [{ t: " ".repeat(FOCUS_INDENT) }, { t: l, color: turn.isError ? "red" : void 0, flex: true }]
+      },
+      i
+    ))
   ] });
 }
 
@@ -2345,10 +2451,11 @@ function App({
   const [filterDraft, setFilterDraft] = useState2(initialFilter);
   const [filtering, setFiltering] = useState2(false);
   const [cursor, setCursor] = useState2(0);
-  const [sessionCursor, setSessionCursor] = useState2(0);
+  const [rowCursor, setRowCursor] = useState2(0);
   const [openDir, setOpenDir] = useState2(null);
   const [openFile, setOpenFile] = useState2(null);
   const [scroll, setScroll] = useState2(0);
+  const [focusTurn, setFocusTurn] = useState2(void 0);
   const [now, setNow] = useState2(() => /* @__PURE__ */ new Date());
   useEffect2(() => {
     const t = setInterval(() => setNow(/* @__PURE__ */ new Date()), 1e3);
@@ -2378,42 +2485,61 @@ function App({
     return null;
   }, [projects, openFile]);
   const view = openSession ? "detail" : openProject ? "project" : "root";
-  const sessionIndex = openProject ? Math.min(sessionCursor, Math.max(0, openProject.sessions.length - 1)) : 0;
+  const projectRowCount = openProject ? projectRows(openProject) : 0;
+  const rowIndex = openProject ? Math.min(rowCursor, Math.max(0, projectRowCount - 1)) : 0;
+  const actionCount = openProject?.supervision.actions.length ?? 0;
   const panelH = Math.max(6, height - 8);
   const innerW = width - 4;
   const innerH = panelH - 2;
-  const maxScroll = openSession ? Math.max(0, openSession.turns.length - transcriptCapacity(openSession, innerH)) : 0;
+  const maxScroll = openSession ? Math.max(0, openSession.turns.length - transcriptCapacity(openSession, innerH, innerW, focusTurn)) : 0;
   useKeymap(
     { filtering, view: view === "detail" ? "detail" : "root" },
     {
       onUp: () => {
         if (view === "detail") setScroll((s) => Math.max(0, s - 1));
-        else if (view === "project") setSessionCursor((c) => Math.max(0, Math.min(c, sessionIndex) - 1));
+        else if (view === "project") setRowCursor((c) => Math.max(0, Math.min(c, rowIndex) - 1));
         else setCursor((c) => Math.max(0, Math.min(c, projectIndex) - 1));
       },
       onDown: () => {
         if (view === "detail") setScroll((s) => Math.min(maxScroll, s + 1));
-        else if (view === "project" && openProject)
-          setSessionCursor((c) => Math.min(openProject.sessions.length - 1, c + 1));
+        else if (view === "project") setRowCursor((c) => Math.min(projectRowCount - 1, c + 1));
         else setCursor((c) => Math.min(visibleProjects.length - 1, c + 1));
       },
       onEnter: () => {
         if (view === "detail") return;
         if (view === "project" && openProject) {
-          const session = openProject.sessions[sessionIndex];
+          const action = openProject.supervision.actions[rowIndex];
+          if (rowIndex < actionCount && action) {
+            const target = openProject.sessions.find((s) => s.sessionId === action.sessionId);
+            if (!target) return;
+            const at = action.turnIndex;
+            setOpenFile(target.filePath);
+            setFocusTurn(at);
+            const capacity = transcriptCapacity(target, innerH, innerW, at);
+            setScroll(
+              at === void 0 ? Math.max(0, target.turns.length - capacity) : (
+                // Two rows of run-up, so the turn arrives with its context.
+                Math.min(Math.max(0, target.turns.length - capacity), Math.max(0, at - 2))
+              )
+            );
+            return;
+          }
+          const session = openProject.sessions[rowIndex - actionCount];
           if (!session) return;
           setOpenFile(session.filePath);
-          setScroll(Math.max(0, session.turns.length - transcriptCapacity(session, innerH)));
+          setFocusTurn(void 0);
+          setScroll(Math.max(0, session.turns.length - transcriptCapacity(session, innerH, innerW)));
           return;
         }
         if (currentProject) {
           setOpenDir(currentProject.dir);
-          setSessionCursor(0);
+          setRowCursor(0);
         }
       },
       onBack: () => {
         if (view === "detail") {
           setOpenFile(null);
+          setFocusTurn(void 0);
           setScroll(0);
         } else if (view === "project") {
           setOpenDir(null);
@@ -2491,7 +2617,7 @@ function App({
         { key: "R", label: "Refresh" },
         { key: "Q", label: "Quit" }
       ],
-      /* @__PURE__ */ jsx7(SessionDetail, { session: openSession, scroll: Math.min(scroll, maxScroll), width: innerW, height: innerH, now })
+      /* @__PURE__ */ jsx7(SessionDetail, { session: openSession, scroll: Math.min(scroll, maxScroll), width: innerW, height: innerH, now, focus: focusTurn })
     );
   }
   if (openProject) {
@@ -2504,14 +2630,14 @@ function App({
       { ratio: prog.total ? prog.completed / prog.total : 0, label: prog.total ? `${prog.completed}/${prog.total}` : `${openProject.sessions.length} sessions` },
       { title: "Project", subtitle: openProject.label, meta: `${glyphForProject(s.status)} ${s.status} \xB7 ${agoLabel(openProject.lastActivity, now)}` },
       [
-        { key: "\u2191\u2193", label: "Sessions" },
+        { key: "\u2191\u2193", label: actionCount > 0 ? "Needs you \xB7 sessions" : "Sessions" },
         { key: "\u23CE", label: "Transcript" },
         ...ai ? [{ key: "A", label: "Next steps" }] : [],
         { key: "Esc", label: "Back" },
         { key: "R", label: "Refresh" },
         { key: "Q", label: "Quit" }
       ],
-      /* @__PURE__ */ jsx7(ProjectView, { project: openProject, cursor: sessionIndex, width: innerW, height: innerH, now })
+      /* @__PURE__ */ jsx7(ProjectView, { project: openProject, cursor: rowIndex, width: innerW, height: innerH, now })
     );
   }
   const shownSessions = visibleProjects.reduce((n, p) => n + p.sessions.length, 0);

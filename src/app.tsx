@@ -6,7 +6,7 @@ import { useSessions } from './hooks/useSessions.js';
 import { useKeymap } from './hooks/useKeymap.js';
 import { Dashboard } from './components/Dashboard.js';
 import { FooterBar, HeaderBar, type KeyHint, Panel, Rule } from './components/Frame.js';
-import { ProjectView } from './components/ProjectView.js';
+import { ProjectView, projectRows } from './components/ProjectView.js';
 import { SessionDetail, transcriptCapacity } from './components/SessionDetail.js';
 import { agoLabel, glyphForProject, glyphForStatus } from './utils/format.js';
 import { planProgress } from './data/plan.js';
@@ -87,10 +87,13 @@ export function App({
   const [filterDraft, setFilterDraft] = useState(initialFilter);
   const [filtering, setFiltering] = useState(false);
   const [cursor, setCursor] = useState(0); // root: project index
-  const [sessionCursor, setSessionCursor] = useState(0); // project view
+  const [rowCursor, setRowCursor] = useState(0); // project view: actions, then sessions
   const [openDir, setOpenDir] = useState<string | null>(null);
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [scroll, setScroll] = useState(0);
+  // Set when the transcript was opened from a NEEDS YOU action: the turn that
+  // action is about, quoted at the top of the detail view.
+  const [focusTurn, setFocusTurn] = useState<number | undefined>(undefined);
   // Re-render on a timer so "2s ago" keeps counting even with no fs events.
   const [now, setNow] = useState(() => new Date());
 
@@ -130,16 +133,16 @@ export function App({
   }, [projects, openFile]);
 
   const view: View = openSession ? 'detail' : openProject ? 'project' : 'root';
-  const sessionIndex = openProject
-    ? Math.min(sessionCursor, Math.max(0, openProject.sessions.length - 1))
-    : 0;
+  const projectRowCount = openProject ? projectRows(openProject) : 0;
+  const rowIndex = openProject ? Math.min(rowCursor, Math.max(0, projectRowCount - 1)) : 0;
+  const actionCount = openProject?.supervision.actions.length ?? 0;
   // Frame chrome: top rule, 2 header rows, rule, panel, rule, footer, bottom
   // rule = 8 rows around the panel, and the whole frame stays at rows - 1.
   const panelH = Math.max(6, height - 8);
   const innerW = width - 4;
   const innerH = panelH - 2; // panel heading + blank
   const maxScroll = openSession
-    ? Math.max(0, openSession.turns.length - transcriptCapacity(openSession, innerH))
+    ? Math.max(0, openSession.turns.length - transcriptCapacity(openSession, innerH, innerW, focusTurn))
     : 0;
 
   useKeymap(
@@ -147,33 +150,52 @@ export function App({
     {
       onUp: () => {
         if (view === 'detail') setScroll((s) => Math.max(0, s - 1));
-        else if (view === 'project') setSessionCursor((c) => Math.max(0, Math.min(c, sessionIndex) - 1));
+        else if (view === 'project') setRowCursor((c) => Math.max(0, Math.min(c, rowIndex) - 1));
         else setCursor((c) => Math.max(0, Math.min(c, projectIndex) - 1));
       },
       onDown: () => {
         if (view === 'detail') setScroll((s) => Math.min(maxScroll, s + 1));
-        else if (view === 'project' && openProject)
-          setSessionCursor((c) => Math.min(openProject.sessions.length - 1, c + 1));
+        else if (view === 'project') setRowCursor((c) => Math.min(projectRowCount - 1, c + 1));
         else setCursor((c) => Math.min(visibleProjects.length - 1, c + 1));
       },
       onEnter: () => {
         if (view === 'detail') return;
         if (view === 'project' && openProject) {
-          const session = openProject.sessions[sessionIndex];
+          // An action row: go to the session it names, at the turn it is about.
+          // Nothing is resumed or answered -- we only stop making you look.
+          const action = openProject.supervision.actions[rowIndex];
+          if (rowIndex < actionCount && action) {
+            const target = openProject.sessions.find((s) => s.sessionId === action.sessionId);
+            if (!target) return;
+            const at = action.turnIndex;
+            setOpenFile(target.filePath);
+            setFocusTurn(at);
+            const capacity = transcriptCapacity(target, innerH, innerW, at);
+            setScroll(
+              at === undefined
+                ? Math.max(0, target.turns.length - capacity)
+                : // Two rows of run-up, so the turn arrives with its context.
+                  Math.min(Math.max(0, target.turns.length - capacity), Math.max(0, at - 2)),
+            );
+            return;
+          }
+          const session = openProject.sessions[rowIndex - actionCount];
           if (!session) return;
           setOpenFile(session.filePath);
+          setFocusTurn(undefined);
           // Open at the bottom: the newest turns are the point of the view.
-          setScroll(Math.max(0, session.turns.length - transcriptCapacity(session, innerH)));
+          setScroll(Math.max(0, session.turns.length - transcriptCapacity(session, innerH, innerW)));
           return;
         }
         if (currentProject) {
           setOpenDir(currentProject.dir);
-          setSessionCursor(0);
+          setRowCursor(0);
         }
       },
       onBack: () => {
         if (view === 'detail') {
           setOpenFile(null);
+          setFocusTurn(undefined);
           setScroll(0);
         } else if (view === 'project') {
           setOpenDir(null);
@@ -271,7 +293,7 @@ export function App({
         { key: 'R', label: 'Refresh' },
         { key: 'Q', label: 'Quit' },
       ],
-      <SessionDetail session={openSession} scroll={Math.min(scroll, maxScroll)} width={innerW} height={innerH} now={now} />,
+      <SessionDetail session={openSession} scroll={Math.min(scroll, maxScroll)} width={innerW} height={innerH} now={now} focus={focusTurn} />,
     );
   }
 
@@ -285,14 +307,14 @@ export function App({
       { ratio: prog.total ? prog.completed / prog.total : 0, label: prog.total ? `${prog.completed}/${prog.total}` : `${openProject.sessions.length} sessions` },
       { title: 'Project', subtitle: openProject.label, meta: `${glyphForProject(s.status)} ${s.status} · ${agoLabel(openProject.lastActivity, now)}` },
       [
-        { key: '↑↓', label: 'Sessions' },
+        { key: '↑↓', label: actionCount > 0 ? 'Needs you · sessions' : 'Sessions' },
         { key: '⏎', label: 'Transcript' },
         ...(ai ? [{ key: 'A', label: 'Next steps' }] : []),
         { key: 'Esc', label: 'Back' },
         { key: 'R', label: 'Refresh' },
         { key: 'Q', label: 'Quit' },
       ],
-      <ProjectView project={openProject} cursor={sessionIndex} width={innerW} height={innerH} now={now} />,
+      <ProjectView project={openProject} cursor={rowIndex} width={innerW} height={innerH} now={now} />,
     );
   }
 

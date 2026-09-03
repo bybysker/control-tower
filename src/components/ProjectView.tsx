@@ -4,6 +4,7 @@ import type { Project, UserAction } from '../data/types.js';
 import { SessionRow } from './SessionRow.js';
 import { describeGit } from '../data/project.js';
 import {
+  actionLocator,
   colorForProject,
   colorForStep,
   columns,
@@ -26,17 +27,26 @@ const MAX_MEMORY = 6;
 
 interface ProjectViewProps {
   project: Project;
-  /** Selected session index. */
+  /** Selected row: actions first, then sessions. See `projectRows`. */
   cursor: number;
   width: number;
   height: number;
   now: Date;
 }
 
-/** A question may wrap onto a second line; its options take one more. */
+/**
+ * The ↑↓ list is the actions and then the sessions, in that order, so `⏎` on an
+ * action can open the transcript at the turn it is about. `cursor` indexes into
+ * that combined list; anything at or past `actions.length` is a session.
+ */
+export function projectRows(project: Project): number {
+  return project.supervision.actions.length + project.sessions.length;
+}
+
+/** A question may wrap onto a second line; its options and locator take one each. */
 function actionRows(a: UserAction, width: number): number {
-  const wrapped = Math.min(2, Math.ceil(columns(a.label) / Math.max(20, width - 12)));
-  return wrapped + (a.options && a.options.length > 0 ? 1 : 0);
+  const wrapped = Math.min(2, Math.ceil(columns(a.label) / Math.max(20, width - 14)));
+  return wrapped + (a.options && a.options.length > 0 ? 1 : 0) + 1;
 }
 
 /** Rows above the session list, so the list can be windowed to what is left. */
@@ -63,8 +73,11 @@ export function ProjectView({ project, cursor, width, height, now }: ProjectView
   // `height` is the frame panel's inner height; one row is kept for the
   // "↓ N more" marker.
   const capacity = Math.max(2, height - fixed - 1);
+  // Cursor rows below the actions are session rows; while an action is
+  // selected the session list keeps its first page.
+  const sessionCursor = cursor - s.actions.length;
   const maxOffset = Math.max(0, project.sessions.length - capacity);
-  const offset = Math.min(maxOffset, Math.max(0, cursor - capacity + 1));
+  const offset = Math.min(maxOffset, Math.max(0, sessionCursor - capacity + 1));
   const visible = project.sessions.slice(offset, offset + capacity);
   const hiddenBelow = Math.max(0, project.sessions.length - offset - capacity);
   const rule = (label: string): string => `── ${label} ${'─'.repeat(Math.max(0, width - label.length - 4))}`;
@@ -93,20 +106,26 @@ export function ProjectView({ project, cursor, width, height, now }: ProjectView
           {s.actions.map((a, i) => (
             <Box key={`${a.sessionId}-${i}`} flexDirection="column">
               <Box>
+                <Text color={i === cursor ? 'cyan' : undefined}>{i === cursor ? '❯ ' : '  '}</Text>
                 <Text color="redBright">{labelForAction(a.kind).padEnd(9)}</Text>
                 {/* Up to two wrapped lines: the question is the point of the view.
                     Width leaves 6 cells for the age, or it gets clipped to '2'. */}
-                <Box width={width - 9 - 6}>
-                  <Text wrap="wrap">{truncate(a.label, 2 * (width - 15))}</Text>
+                <Box width={width - 2 - 9 - 6}>
+                  <Text wrap="wrap">{truncate(a.label, 2 * (width - 17))}</Text>
                 </Box>
                 <Text dimColor> {timeAgo(a.since, now).padStart(4)}</Text>
               </Box>
               {a.options && a.options.length > 0 ? (
                 <Text color="yellow">
-                  {' '.repeat(9)}
-                  {truncate(a.options.map((o) => `[${o}]`).join('  '), width - 10)}
+                  {' '.repeat(11)}
+                  {truncate(a.options.map((o) => `[${o}]`).join('  '), width - 12)}
                 </Text>
               ) : null}
+              {/* Which window to go to, and — with ⏎ — where to look once there. */}
+              <Text dimColor>
+                {' '.repeat(11)}
+                {truncate(`↳ ${actionLocator(a, now)}`, width - 12)}
+              </Text>
             </Box>
           ))}
         </Box>
@@ -176,7 +195,7 @@ export function ProjectView({ project, cursor, width, height, now }: ProjectView
         <SessionRow
           key={session.filePath}
           session={session}
-          selected={offset + i === cursor}
+          selected={offset + i === sessionCursor}
           width={width}
           now={now}
         />

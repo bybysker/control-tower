@@ -42,7 +42,9 @@ clear-screen is Ink giving up on incremental repaint; on screen it is flicker.
    `src/app.tsx` for the two deep views, then `transcriptCapacity()` in
    `SessionDetail.tsx` and `projectViewFixedRows()` in `ProjectView.tsx` for
    what fits inside them. Add a row to any view and you must pay for it in the
-   matching budget.
+   matching budget. A variable-height block pays through one shared function
+   the renderer and the budget both call — `focusBlockRows()`/`focusBody()` —
+   never two counts that have to be kept in step by hand.
 3. **`overflow="hidden"` corrupts rows adjacent to a blank row** when content
    is taller than the box: the first character of the neighbour is lost and the
    blank disappears (`ctive Project`, `ath`). → Panels slice their own rows to
@@ -155,4 +157,4 @@ copy you write; the tool's credibility rests on not overclaiming.
 npm run typecheck && npm run lint && npm test && npm run build
 ```
 
-121 tests, under a second. CI runs the same four plus two smoke steps.
+145 tests, under a second. CI runs the same four plus two smoke steps.
