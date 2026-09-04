@@ -1,6 +1,6 @@
 import { formatDistanceStrict } from 'date-fns';
 import stringWidth from 'string-width';
-import type { ActionKind, NextStep, ProjectStatus, Status, TaskStatus } from '../data/types.js';
+import type { ActionKind, NextStep, ProjectStatus, Status, TaskStatus, UserAction } from '../data/types.js';
 
 /** "2s", "4h", "3d" -- compact enough for a fixed-width column. */
 export function timeAgo(date: Date, now: Date = new Date()): string {
@@ -175,6 +175,28 @@ export function labelForAction(kind: ActionKind): string {
     default:
       return 'reply';
   }
+}
+
+/**
+ * The line under a NEEDS YOU row: which session, so you know which window.
+ *
+ * Title, entrypoint, when it started, working directory, short id -- every one
+ * a fact the transcript recorded about itself. It says where the session was
+ * started, never that anything is still alive there: for `answer`, `reply` and
+ * `unblock` the process is somewhere we cannot see, and this line must not read
+ * as evidence to the contrary.
+ */
+export function actionLocator(a: UserAction, now: Date = new Date()): string {
+  const parts: string[] = [];
+  const title = truncate(a.sessionTitle ?? '', 32);
+  if (title) parts.push(title);
+  if (a.entrypoint) parts.push(a.entrypoint);
+  if (a.startedAt) parts.push(`started ${agoLabel(a.startedAt, now)}`);
+  // The tail of a path is the informative half: `…/bootcamp/api` locates you,
+  // `/Users/someone/Dev…` does not.
+  if (a.cwd) parts.push(truncateStart(a.cwd, 34));
+  parts.push(`#${a.sessionId.slice(0, 8)}`);
+  return parts.join(' · ');
 }
 
 /** "now", or "12s ago" -- never "now ago". */

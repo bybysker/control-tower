@@ -123,6 +123,22 @@ export interface UserAction {
   sessionId: string;
   sessionTitle: string;
   since: Date;
+  /**
+   * Which window to switch to. Facts on disk, copied off the session so the
+   * card can name it without a lookup: none of them says the process is still
+   * alive, and the copy must not start reading as one.
+   */
+  entrypoint?: string;
+  /** When that session started -- `firstTimestamp`. */
+  startedAt?: Date;
+  /** Its last observed working directory. */
+  cwd?: string;
+  /**
+   * Index into `Session.turns` of the turn this action is about: the failing
+   * result, the call still waiting, the question. Undefined when the tail no
+   * longer holds it -- `turns` is bounded (TRANSCRIPT_TAIL_LIMIT).
+   */
+  turnIndex?: number;
 }
 
 /** Where a next step was derived from. Shown, because certainty differs. */

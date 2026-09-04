@@ -68,6 +68,27 @@ A permission prompt you declined is not an action: you already answered. A
 `reply` from an older session is not either: you moved on. Anything older than
 seven days drops off the card.
 
+Every action carries a second line saying **which session** you have to go to —
+its title, `cli` or `claude-desktop`, when it started, its working directory and
+its short id, all of them things the transcript recorded about itself:
+
+```
+  fix      FAIL tests/auth.spec.ts — expected 200, received 401. 3 failed.   25m
+           ↳ Test suite after the refactor · cli · started 26m ago · …/code/shop-api · #a1b2c3d4
+```
+
+In the project view `↑↓` walks the actions before the sessions, and `⏎` on an
+action opens that session's transcript **at the turn the action is about**,
+quoting it above the stream: for `fix`, the command and the error text in full;
+for `unblock`, the call still waiting and its arguments. On a terminal short
+enough that the quote would crowd out the transcript, the quote is dropped and
+the scroll position alone does the work.
+
+That is where it stops. `answer`, `reply` and `unblock` are a live process in
+another terminal, and nothing on disk says whether it is still alive — so
+Control Tower never resumes, answers or retries. It tells you which window and
+what is waiting there.
+
 ### Your turn
 
 Some work cannot be delegated at all: an agent with the whole repository still
@@ -162,8 +183,8 @@ the transcript ends mid-work"; `done` means "the last turn closed cleanly", not
 
 | Dashboard | Project | Session |
 |---|---|---|
-| `↑↓` `jk` projects | `↑↓` `jk` sessions | `↑↓` `jk` scroll |
-| `⏎` `l` open | `⏎` `l` transcript | |
+| `↑↓` `jk` projects | `↑↓` `jk` actions, then sessions | `↑↓` `jk` scroll |
+| `⏎` `l` open | `⏎` `l` transcript (at the action's turn) | |
 | `/` filter · `a` next steps (`--ai`) | `esc` `h` back | `esc` `h` back |
 | `r` rescan · `q` quit | `r` · `q` | `r` · `q` |
 

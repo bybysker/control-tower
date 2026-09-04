@@ -7,6 +7,7 @@ import { planProgress } from '../data/plan.js';
 import { ACCENT, CHECK, FooterBar, HeaderBar, type KeyHint, Panel, Rule, RULE, SELECT_BG } from './Frame.js';
 import { Line, type Seg, wrapText } from './Line.js';
 import {
+  actionLocator,
   colorForProject,
   colorForStatus,
   colorForStep,
@@ -195,6 +196,15 @@ function ActiveProject({ project, width, rows: maxRows, now, summary }: { projec
       if (a.options && a.options.length > 0) {
         rows.push(<Line key={`ao-${a.sessionId}`} width={width} segs={[{ t: '           ' }, { t: a.options.map((o) => `[${o}]`).join('  '), color: 'yellow' }]} />);
       }
+      // Which window to switch to. Without it the card names a symptom and
+      // leaves the hunt for the session to the reader.
+      rows.push(
+        <Line
+          key={`al-${a.sessionId}-${a.kind}`}
+          width={width}
+          segs={[{ t: '           ' }, { t: '↳ ', color: RULE }, { t: actionLocator(a, now), dim: true, flex: true }]}
+        />,
+      );
     }
   }
 

@@ -56,7 +56,7 @@ Uninstall with `npm uninstall -g control-tower`.
   <img src="docs/assets/project.svg" alt="A project view: an unanswered question with its options, the plan, a PR, memory notes, and the sessions" width="860">
 </p>
 
-- **Needs you** — Claude asked a question and is waiting; a tool call errored; a permission prompt is pending.
+- **Needs you** — Claude asked a question and is waiting; a tool call errored; a permission prompt is pending. Each one names the session under it — `cli`, when it started, its directory, its short id — so you know which window to switch to, and `⏎` opens that transcript at the turn in question with the error or the pending call quoted in full.
 - **Your turn** — what nobody can delegate: `▲ Get STRIPE_SECRET_KEY` needs a console and a card. The twenty variables an agent *can* fill collapse into one line.
 - **Where we are** — the last thing Claude said.
 - **Next** — `✓●○` from Claude's own plan, `→` from the repository (unpushed, uncommitted, unpublished), `∴` from Claude, if you opt in.
@@ -67,7 +67,12 @@ wrong: [docs/status-heuristics.md](docs/status-heuristics.md).
 ## Keys
 
 `↑↓` projects · `⏎` open · `/` filter · `r` rescan · `q` quit — and inside a
-project, `⏎` again for the transcript, `esc` back.
+project, `↑↓` walks the *Needs you* items and then the sessions, `⏎` opens the
+transcript (at the turn an action points at), `esc` back.
+
+Nothing is ever resumed, answered or retried: three of the four things a
+project can be waiting on are a live process in another terminal, and Control
+Tower cannot see it. It points; you decide.
 
 ## Options
 
